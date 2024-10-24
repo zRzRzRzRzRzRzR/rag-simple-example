@@ -1,0 +1,15 @@
+transformers>=4.46.0
+psycopg2>=2.9.10
+oss2>=2.19.0
+openai>=1.52.0
+scikit-learn>=1.5.2
+langchain>=0.3.4
+langchain-community>=0.3.3
+langchain_openai>=0.2.3
+gradio>=5.1.0
+pypdf>=5.0.1
+tiktoken>=0.8.0
+marker-pdf>=0.3.5
+flask>=3.0.3
+requests>=2.32.3
+huggingface-hub>=0.26.0
