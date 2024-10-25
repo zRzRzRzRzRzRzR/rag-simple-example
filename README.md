@@ -1,5 +1,11 @@
 # Simple RAG System
 
+## 效果演示
+
+<div align="center">
+  <video src="https://github.com/user-attachments/assets/3ed5d9f8-c5d0-448d-9be1-89b40551da6f" width="80%" controls autoplay></video>
+</div>
+
 ## 部署并运行模型
 
 ### 1. 使用docker构建数据库
@@ -75,6 +81,8 @@ python app.py
 
 你将会看到一个由 gradio部署的前端UI，能够可视化的选择模型，选择文件，以及和大模型进行RAG对话。
 
++ 端口默认为`127.0.0.1:7860`,这也适用于服务器设备。
+
 + 对 Textbook.pdf 可能需要数分钟才能完成分词。
 
 ## 局限性
@@ -85,6 +93,7 @@ python app.py
 2. 无法进行批量推理
 3. 初始化未配置config等配置文件，直接在python代码中修改。
 4. 没有对图片进行处理。
+5. 无系统性前端。
 
 ## 开源协议
 

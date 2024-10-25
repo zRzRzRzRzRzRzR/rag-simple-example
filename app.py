@@ -12,40 +12,28 @@ import oss2
 from oss2.credentials import EnvironmentVariableCredentialsProvider
 from utils import calculate_md5, split_markdown_words, upload_to_oss, delete_file_action, chat_with_model_rag
 
-conn = None
-cursor = None
-embeddings = None
-snowflake = None
-client = None
-bucket = None
-
-default_api_key = "your api_keys"
+default_api_key = ""
 default_api_url = "https://open.bigmodel.cn/api/paas/v4"
 default_llm_model = "glm-4-airx"
 default_embedding_model = "embedding-3"
 flask_pdf_converter_url = "http://localhost:5001/convert_pdf"
 
-os.environ["OSS_ACCESS_KEY_ID"] = "your access key id"
-os.environ["OSS_ACCESS_KEY_SECRET"] = "your access key secret"
+os.environ['OSS_ACCESS_KEY_ID'] = ''
+os.environ['OSS_ACCESS_KEY_SECRET'] = ''
 bucket_name = "zrzrzr"
 endpoint = "oss-cn-beijing.aliyuncs.com"
+PG_HOST = "localhost"
+PG_PORT = "54320"
+PG_USER = "postgres"
+PG_PASSWORD = "dianjiao29"  # Replace with your PostgreSQL password
+PG_DATABASE = "zrkb"
 
 
 # Initialize the database connection, models, and OSS
-def initialize(api_key=default_api_key, api_url=default_api_url, embedding_model=default_embedding_model):
-    global conn, cursor, embeddings, snowflake, client, bucket
-
-    PG_HOST = "localhost"
-    PG_PORT = "54320"
-    PG_USER = "postgres"
-    PG_PASSWORD = "dianjiao29"  # Replace with your PostgreSQL password
-    PG_DATABASE = "zrkb"
-
+def initialize(api_key="none", api_url="none", embedding_model="none"):
     conn = psycopg2.connect(host=PG_HOST, port=PG_PORT, user=PG_USER, password=PG_PASSWORD, database=PG_DATABASE)
     cursor = conn.cursor()
-
     client = OpenAI(api_key=api_key, base_url=api_url)
-
     embeddings = OpenAIEmbeddings(model=embedding_model, openai_api_base=api_url, openai_api_key=api_key)
 
     class SnowflakeGenerator:
@@ -90,10 +78,10 @@ def initialize(api_key=default_api_key, api_url=default_api_url, embedding_model
                     self.sequence = 0
                 self.last_timestamp = timestamp
                 new_id = (
-                    ((timestamp - self.EPOCH) << self.TIMESTAMP_LEFT_SHIFT)
-                    | (self.data_center_id << self.DATA_CENTER_ID_SHIFT)
-                    | (self.worker_id << self.WORKER_ID_SHIFT)
-                    | self.sequence
+                        ((timestamp - self.EPOCH) << self.TIMESTAMP_LEFT_SHIFT)
+                        | (self.data_center_id << self.DATA_CENTER_ID_SHIFT)
+                        | (self.worker_id << self.WORKER_ID_SHIFT)
+                        | self.sequence
                 )
                 return new_id
 
@@ -102,6 +90,7 @@ def initialize(api_key=default_api_key, api_url=default_api_url, embedding_model
     # Initialize OSS
     auth = oss2.ProviderAuth(EnvironmentVariableCredentialsProvider())
     bucket = oss2.Bucket(auth, endpoint, bucket_name)
+    return conn, cursor, embeddings, snowflake, client, bucket
 
 
 def vectorize_markdown(embeddings, cursor, snowflake, conn, bucket, docs, markdown_file_path):
@@ -276,7 +265,7 @@ def vectorize_markdown(embeddings, cursor, snowflake, conn, bucket, docs, markdo
     return "\n".join(results)
 
 
-def gradio_interface():
+def gradio_interface(conn, cursor, embeddings, snowflake, client, bucket):
     with gr.Blocks() as demo:
         gr.Markdown("""
                    <div style="text-align: center; font-size: 32px; font-weight: bold; margin-bottom: 20px;">
@@ -300,7 +289,6 @@ def gradio_interface():
             apply_settings_button = gr.Button("Apply Settings")
             settings_output = gr.Textbox(label="Settings Status", visible=False, lines=2)
 
-            # Settings update handler
             def update_settings(api_key, api_url, llm_model, embedding_model, temperature, top_k):
                 initialize(api_key=api_key, api_url=api_url, embedding_model=embedding_model)
                 return (
@@ -343,7 +331,6 @@ def gradio_interface():
                     markdown_file_paths.value = markdown_paths
                     return pd.concat(results)
 
-                # Handling vectorization, storing results in the DataFrame
                 def handle_vectorize():
                     vectorize_results = []
                     for markdown_path, docs in markdown_file_paths.value:
@@ -357,29 +344,25 @@ def gradio_interface():
                     )
                     return results_df
 
-                # Clicking Split Button to start text splitting
                 split_button.click(fn=handle_split_text, inputs=pdf_input, outputs=split_result)
-
-                # Clicking Vectorize Button to start vectorization
                 vectorize_button.click(fn=handle_vectorize, outputs=vectorize_result)
 
                 gr.Markdown("### File List and Deletion")
-                file_selection = gr.Dropdown(label="Select Files to Delete", multiselect=True, choices=[])
+                file_selection = gr.Dropdown(label="Select Files to Delete", multiselect=True, choices=[],
+                                             allow_custom_value=True)
                 refresh_button = gr.Button("Refresh File List")
                 delete_button = gr.Button("Delete Selected Files")
                 file_deletion_result = gr.DataFrame(headers=["File", "Result"], label="Deletion Result", visible=True)
 
-                # List files function for dropdown
+                # Function to update file selection dropdown with filenames from the database
                 def update_file_selection():
                     cursor.execute("SELECT filename FROM max_kb_file")
                     files = cursor.fetchall()
                     file_list = [file[0] for file in files]
                     return file_list
 
-                # Refresh button updates the dropdown list
                 refresh_button.click(fn=update_file_selection, outputs=file_selection)
 
-                # Batch deletion handler
                 def handle_file_deletion(selected_files):
                     results = []
                     for file_name in selected_files:
@@ -387,7 +370,6 @@ def gradio_interface():
                         results.append({"File": file_name, "Result": result})
                     return pd.DataFrame(results)
 
-                # Clicking Delete button to delete selected files
                 delete_button.click(fn=handle_file_deletion, inputs=file_selection, outputs=file_deletion_result)
 
             with gr.Column():
@@ -401,7 +383,7 @@ def gradio_interface():
 
                 def chat(user_input, history, api_key, api_url, llm_model, embedding_model, temperature, top_k):
                     history = history or []
-                    initialize(api_key=api_key, api_url=api_url, embedding_model=embedding_model)
+                    conn, cursor, embeddings, snowflake, client, bucket = initialize(api_key=api_key, api_url=api_url, embedding_model=embedding_model)
                     updated_history, related_docs_df = chat_with_model_rag(
                         embeddings, cursor, client, user_input, history, llm_model, temperature, top_k
                     )
@@ -427,6 +409,11 @@ def gradio_interface():
 
 
 if __name__ == "__main__":
-    initialize()
-    demo = gradio_interface()
+    conn, cursor, embeddings, snowflake, client, bucket = initialize(
+        api_key=default_api_key,
+        api_url=default_api_url,
+        embedding_model=default_embedding_model
+    )
+
+    demo = gradio_interface(conn, cursor, embeddings, snowflake, client, bucket)
     demo.launch()
