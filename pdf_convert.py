@@ -1,3 +1,4 @@
+import torch
 from flask import Flask, request, jsonify
 from marker.convert import convert_single_pdf
 from marker.models import load_all_models
@@ -6,7 +7,7 @@ from marker.models import load_all_models
 app = Flask(__name__)
 
 # Load the model once at the start
-pdf_convert_model = load_all_models()
+pdf_convert_model = load_all_models(dtype=torch.bfloat16)
 
 
 @app.route("/convert_pdf", methods=["POST"])
@@ -19,7 +20,7 @@ def convert_pdf():
     pdf_file.save(file_path)
 
     # Convert PDF using the preloaded model
-    full_text, images, out_metadata = convert_single_pdf(file_path, pdf_convert_model)
+    full_text, images, out_metadata = convert_single_pdf(file_path, pdf_convert_model, batch_multiplier=1)
     return jsonify({"full_text": full_text, "metadata": out_metadata})
 
 
