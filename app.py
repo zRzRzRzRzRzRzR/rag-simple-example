@@ -1,4 +1,5 @@
 import gradio as gr
+import numpy as np
 from langchain_openai import OpenAIEmbeddings
 import psycopg2
 from psycopg2.extras import execute_values, Json
@@ -108,7 +109,17 @@ def vectorize_markdown(embeddings, cursor, snowflake, conn, bucket, docs, markdo
     oss_object_name = upload_to_oss(bucket, markdown_file_path, file_name)
 
     # Step 2: Directly use the already split docs for vectorization
-    vectors = embeddings.embed_documents(docs)
+    # vectors = embeddings.embed_documents(docs)
+
+    all_vectors = []
+    # For ZhipuAI model, not support for more than 8K text
+    batch_size = 4
+    for i in range(0, len(docs), batch_size):
+        batch_docs = docs[i:i + batch_size]
+        batch_vectors = embeddings.embed_documents(batch_docs)
+        all_vectors.extend(batch_vectors)
+
+    vectors = np.vstack(all_vectors)
 
     # Step 3: Record file information in the database
     file_id = snowflake.get_id()

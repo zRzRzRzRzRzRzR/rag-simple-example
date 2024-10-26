@@ -7,7 +7,7 @@ from marker.models import load_all_models
 app = Flask(__name__)
 
 # Load the model once at the start
-pdf_convert_model = load_all_models(dtype=torch.bfloat16)
+pdf_convert_model = load_all_models()
 
 
 @app.route("/convert_pdf", methods=["POST"])
